@@ -96,6 +96,8 @@ class BlockEditorRestEndpoint_Plugin extends BlockEditorRestEndpoint_LifeCycle {
         // Add Actions & Filters
         // http://plugin.michael-simpson.com/?page_id=37
         add_action('wp_footer', array(&$this, 'get_blocks_array'));
+        add_action('rest_api_init', array(&$this, 'provide_start_page'));
+
 
 
         // Adding scripts & styles to all pages
@@ -121,8 +123,23 @@ class BlockEditorRestEndpoint_Plugin extends BlockEditorRestEndpoint_LifeCycle {
         $test = $result[1]->post_content;
         $reg = '/<!--\swp:(.+?)\s-->\n(.*?)\n/';
         preg_match_all($reg, $result[1]->post_content, $matches);
-
+        return $matches;
     }
+
+    public function provide_start_page()
+	{
+		register_rest_route( 'stiegi/v1', 'startpage/',array(
+			'methods'  => 'GET',
+			'callback' => array(&$this, 'get_start_page')
+		));
+	}
+
+	public function get_start_page()
+	{
+		$response = new WP_REST_Response($this->get_blocks_array());
+		$response->set_status(200);
+		return $response;
+	}
 
 
 }
