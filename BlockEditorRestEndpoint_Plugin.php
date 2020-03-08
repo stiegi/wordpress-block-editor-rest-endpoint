@@ -96,7 +96,7 @@ class BlockEditorRestEndpoint_Plugin extends BlockEditorRestEndpoint_LifeCycle {
         // Add Actions & Filters
         // http://plugin.michael-simpson.com/?page_id=37
         add_action('wp_footer', array(&$this, 'get_blocks_array'));
-        add_action('rest_api_init', array(&$this, 'provide_start_page'));
+        add_action('rest_api_init', array(&$this, 'provide_post_as_block'));
 
 
 
@@ -116,29 +116,47 @@ class BlockEditorRestEndpoint_Plugin extends BlockEditorRestEndpoint_LifeCycle {
 
     }
 
-    public function get_blocks_array()
-    {
-        global $wpdb;
-        $result = $wpdb->get_results('SELECT post_content FROM ' . $wpdb->posts .  ' WHERE post_type = "post" LIMIT 10');
-        $test = $result[1]->post_content;
-        $reg = '/<!--\swp:(.+?)\s-->\n(.*?)\n/';
-        preg_match_all($reg, $result[1]->post_content, $matches);
-        return $matches;
-    }
 
-    public function provide_start_page()
+
+    public function provide_post_as_block()
 	{
-		register_rest_route( 'stiegi/v1', 'startpage/',array(
+		register_rest_route( 'stiegi/v1', 'post/(?P<id>\d+)',array(
 			'methods'  => 'GET',
-			'callback' => array(&$this, 'get_start_page')
+			'callback' => array(&$this, 'get_post')
 		));
 	}
 
-	public function get_start_page()
-	{
-		$response = new WP_REST_Response($this->get_blocks_array());
+
+	function get_post($request) {
+		global $wpdb;
+		$id = $request['id'];
+		$post_content = $wpdb->get_results('SELECT post_content FROM ' . $wpdb->posts .  ' WHERE post_type = "post" AND ID = ' . $id . ' LIMIT 10');
+		if (empty($post_content)) {
+			return new WP_Error( 'empty_post', 'there is no post with this id', array('status' => 404) );
+		}
+
+		$response = new WP_REST_Response($this->get_blocks_array($id));
 		$response->set_status(200);
 		return $response;
+	}
+
+	public function get_blocks_array($id)
+	{
+		global $wpdb;
+		$result = $wpdb->get_results('SELECT post_content FROM ' . $wpdb->posts .  ' WHERE post_type = "post" AND ID = "' . $id . '" LIMIT 10');
+		$reg = '/<!--\swp:(.+?)\s-->\n(.*?)\n/';
+		preg_match_all($reg, $result[0]->post_content, $matches);
+		$output = array();
+		for ($x = 1; $x < count($matches); $x++) {
+			foreach($matches[$x] as $key => $match) {
+				$property_name = 'type';
+				if ($x === 2) {
+					$property_name = "content";
+				}
+				$output[$key][$property_name] = $match;
+			}
+		}
+		return $output;
 	}
 
 
